@@ -17,6 +17,7 @@ Source project repos:
 | [2026-10-07](2026-10-07.md) | 10h total — PaliVerse 6h (12:30–18:30), Tikka 1.5h, LogPrompts Research design/planning 2.5h | PaliVerse go-live, Tikka n-gram mapper + S0101 experiment, LogPrompts Research (design) | |
 | [2026-10-08](2026-10-08.md) | 9h total, contiguous 11:30–20:30 — PaliVerse 4h (11:30–15:30) + 2h (18:30–20:30), LogPrompts Research build-out 3h (15:30–18:30) | PaliVerse go-live (auth bug investigation, then OAuth redirect flow + a staged/production writeback bug), LogPrompts Research (Alpha-Log-Probs scaffolding/build) | |
 | [2026-10-09](2026-10-09.md) | 10h total, contiguous 11:30–21:30 — LogPrompts Research 3h (11:30–14:30) + 5h (16:30–21:30), PaliVerse 2h (14:30–16:30) | LogPrompts Research (data-governance cleanup, terminology-impact arm, vLLM backend built), PaliVerse go-live (API key rotation, UI relabeling) | |
+| [2026-10-12](2026-10-12.md) | 8.5h total (11:30–20:00) — LogPrompts Research | LogPrompts Research (ran both study arms on real data, no-go result, wrote FEASIBILITY_REPORT.md, built the audit/presentation package) | |
 
-**Total hours logged so far: 29h** (10h on 2026-10-07, 9h on 2026-10-08, 10h
-on 2026-10-09).
+**Total hours logged so far: 37.5h** (10h on 2026-10-07, 9h on 2026-10-08,
+10h on 2026-10-09, 8.5h on 2026-10-12).
