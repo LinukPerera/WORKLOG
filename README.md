@@ -19,6 +19,7 @@ Source project repos:
 | [2026-10-09](2026-10-09.md) | 10h total, contiguous 11:30–21:30 — LogPrompts Research 3h (11:30–14:30) + 5h (16:30–21:30), PaliVerse 2h (14:30–16:30) | LogPrompts Research (data-governance cleanup, terminology-impact arm, vLLM backend built), PaliVerse go-live (API key rotation, UI relabeling) | |
 | [2026-10-12](2026-10-12.md) | 8.5h total (11:30–20:00) — LogPrompts Research | LogPrompts Research (ran both study arms on real data, no-go result, wrote FEASIBILITY_REPORT.md, built the audit/presentation package) | |
 | [2026-10-13](2026-10-13.md) | 7h total — LogPrompts Research 4h (11:30–15:30), Tikka 3h (16:30–19:30) | LogPrompts Research (OpenAI API compatibility research, experiments plan, live key testing), Tikka (S0101 experiment logging/example-matcher/output-format fixes, live 4-provider run build and retry) | |
+| [2026-10-14](2026-10-14.md) | 7h total — LogPrompts Research 1.5h (11:30–13:00), PaliVerse 1h (14:00–15:00, meeting), Tikka 4.5h (15:00–19:30) | LogPrompts Research (OpenAI judge pilot, severity-stratified AUC finding reverses model recommendation), PaliVerse (meeting), Tikka (S0101 live-run results, 6-metric quality comparison, cost accounting) | |
 
-**Total hours logged so far: 44.5h** (10h on 2026-10-07, 9h on 2026-10-08,
-10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13).
+**Total hours logged so far: 51.5h** (10h on 2026-10-07, 9h on 2026-10-08,
+10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13, 7h on 2026-10-14).
