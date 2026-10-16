@@ -21,7 +21,8 @@ Source project repos:
 | [2026-10-13](2026-10-13.md) | 7h total — LogPrompts Research 4h (11:30–15:30), Tikka 3h (16:30–19:30) | LogPrompts Research (OpenAI API compatibility research, experiments plan, live key testing), Tikka (S0101 experiment logging/example-matcher/output-format fixes, live 4-provider run build and retry) | |
 | [2026-10-14](2026-10-14.md) | 7h total — LogPrompts Research 1.5h (11:30–13:00), PaliVerse 1h (14:00–15:00, meeting), Tikka 4.5h (15:00–19:30) | LogPrompts Research (OpenAI judge pilot, severity-stratified AUC finding reverses model recommendation), PaliVerse (meeting), Tikka (S0101 live-run results, 6-metric quality comparison, cost accounting) | |
 | [2026-10-15](2026-10-15.md) | 7h total — LogPrompts Research 3h (11:30–14:30) + 2h (17:30–19:30), Tikka 2h (15:30–17:30) | LogPrompts Research (judge round 2, all 8 signal layers closed, OpenAI feasibility report, Experiments 2/3 run, Part 2 presentation guide), Tikka (mapper-table branch pushed, S0101 phase closed, Info Tabs evaluation started, production-DB network blocker) | |
+| [2026-10-16](2026-10-16.md) | 7h total — LogPrompts Research 3h (11:30–14:30) + 1.5h (15:30–17:00, meeting), Tikka 2.5h (17:00–19:30) | LogPrompts Research (presentation updates, terminology/results support ahead of a meeting, meeting with Alpha), Tikka (S0101: added DeepSeek + true Meta standard-tier run, caught a Meta pricing-tier mislabel) | |
 
-**Total hours logged so far: 58.5h** (10h on 2026-10-07, 9h on 2026-10-08,
+**Total hours logged so far: 65.5h** (10h on 2026-10-07, 9h on 2026-10-08,
 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13, 7h on 2026-10-14,
-7h on 2026-10-15).
+7h on 2026-10-15, 7h on 2026-10-16).
