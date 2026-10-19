@@ -22,10 +22,8 @@ Source project repos:
 | [2026-10-14](2026-10-14.md) | 7h total — LogPrompts Research 1.5h (11:30–13:00), PaliVerse 1h (14:00–15:00, meeting), Tikka 4.5h (15:00–19:30) | LogPrompts Research (OpenAI judge pilot, severity-stratified AUC finding reverses model recommendation), PaliVerse (meeting), Tikka (S0101 live-run results, 6-metric quality comparison, cost accounting) | |
 | [2026-10-15](2026-10-15.md) | 7h total — LogPrompts Research 3h (11:30–14:30) + 2h (17:30–19:30), Tikka 2h (15:30–17:30) | LogPrompts Research (judge round 2, all 8 signal layers closed, OpenAI feasibility report, Experiments 2/3 run, Part 2 presentation guide), Tikka (mapper-table branch pushed, S0101 phase closed, Info Tabs evaluation started, production-DB network blocker) | |
 | [2026-10-16](2026-10-16.md) | 8h total — LogPrompts Research 3h (11:30–14:30) + 1.5h (15:30–17:00, meeting), Tikka 3.5h (17:00–20:30) | LogPrompts Research (presentation updates, terminology/results support ahead of a meeting, meeting with Alpha), Tikka (S0101: added DeepSeek + true Meta standard-tier run, caught a Meta pricing-tier mislabel) | |
-| [2026-10-19](2026-10-19.md) | 7h explicit (Tikka 3.5h + 3.5h) + an unspecified LogPrompts Research block (started 14:00, bounded ≤3h) | Tikka (S0101 six-provider results/correction, Google Gemini/Gemma investigated and blocked by quota, Info Tabs status check), LogPrompts Research (error-category evaluation phase, moving to new hardware) | No entries found for 2026-10-17/18 (weekend) |
+| [2026-10-19](2026-10-19.md) | 10h total, contiguous 10:30–20:30 — Tikka 3.5h (10:30–14:00) + 3.5h (17:00–20:30), LogPrompts Research 3h (14:00–17:00) | Tikka (S0101 six-provider results/correction, Google Gemini/Gemma investigated and blocked by quota, Info Tabs status check), LogPrompts Research (error-category evaluation phase, moving to new hardware) | No entries found for 2026-10-17/18 (weekend) |
 
-**Total hours logged so far: 73.5h explicit** (10h on 2026-10-07, 9h on
+**Total hours logged so far: 76.5h** (10h on 2026-10-07, 9h on
 2026-10-08, 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13, 7h
-on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 7h on 2026-10-19),
-plus an unspecified-duration LogPrompts Research block on 2026-10-19
-not counted into this total (see that day's file).
+on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on 2026-10-19).
