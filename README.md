@@ -23,7 +23,9 @@ Source project repos:
 | [2026-10-15](2026-10-15.md) | 7h total — LogPrompts Research 3h (11:30–14:30) + 2h (17:30–19:30), Tikka 2h (15:30–17:30) | LogPrompts Research (judge round 2, all 8 signal layers closed, OpenAI feasibility report, Experiments 2/3 run, Part 2 presentation guide), Tikka (mapper-table branch pushed, S0101 phase closed, Info Tabs evaluation started, production-DB network blocker) | |
 | [2026-10-16](2026-10-16.md) | 8h total — LogPrompts Research 3h (11:30–14:30) + 1.5h (15:30–17:00, meeting), Tikka 3.5h (17:00–20:30) | LogPrompts Research (presentation updates, terminology/results support ahead of a meeting, meeting with Alpha), Tikka (S0101: added DeepSeek + true Meta standard-tier run, caught a Meta pricing-tier mislabel) | |
 | [2026-10-19](2026-10-19.md) | 10h total, contiguous 10:30–20:30 — Tikka 3.5h (10:30–14:00) + 3.5h (17:00–20:30), LogPrompts Research 3h (14:00–17:00) | Tikka (S0101 six-provider results/correction, Google Gemini/Gemma investigated and blocked by quota, Info Tabs status check), LogPrompts Research (error-category evaluation phase, moving to new hardware) | No entries found for 2026-10-17/18 (weekend) |
+| [2026-10-20](2026-10-20.md) | 12h total, contiguous 10:30–22:30 — LogPrompts Research 2h (10:30–12:30) + 2h (20:00–22:00), Tikka 7.5h (12:30–20:00) + 0.5h (22:00–22:30) | LogPrompts Research (handoff to a new Windows PC, local DeepSeek judge matches the hosted judges, error-category/sub-category results), Tikka (S0101 Gemini run completed; Info Tabs pipeline rebuilt from scratch and run live across 4 providers, ~$80.86 real cost, one unresolved Gemini billing discrepancy) | LogPrompts Research now pulled from its GitHub repo, not read locally — work moved off this VM |
 
-**Total hours logged so far: 76.5h** (10h on 2026-10-07, 9h on
+**Total hours logged so far: 88.5h** (10h on 2026-10-07, 9h on
 2026-10-08, 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13, 7h
-on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on 2026-10-19).
+on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on 2026-10-19,
+12h on 2026-10-20).
