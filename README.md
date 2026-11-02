@@ -11,6 +11,7 @@ Source project repos:
 - `Tikka_translation_process` (Tikka n-gram mapper table + four-AI translation experiment)
 - `segment-history-db` (PaliVerse segment edit-history investigation, started 2026-10-21)
 - `agent-unit-explanations` (agentic Info Tab/chapter-explanation pipeline, started 2026-10-27)
+- `mini_rag` (PaliVerse RAG — HyDE question-answering + info-tab explanations; Azure migration work started 2026-11-02)
 
 ## Summary
 
@@ -34,10 +35,13 @@ Source project repos:
 | [2026-10-28](2026-10-28.md) | 8h total — Agent Unit Explanations 5h (10:30–15:30), LogPrompts Research 3h (16:30–19:30) | Agent Unit Explanations (real Stage 8 generation across all 149 units, analytics, client deliverable assembled, two rounds of real cost correction to $12.15, a real quality gap found in 2 units, architecture diagram built), LogPrompts Research (learning the employer's new docs-hub/work-log system; read-only exploration only, nothing written to the hub yet) | |
 | [2026-10-29](2026-10-29.md) | 8h total — LogPrompts Research (10:30–14:30 and 16:30–20:30) | LogPrompts Research (docs-hub analysis continued — found the collector misses all git commits on this machine; independently verified Alpha's Shindan "profile 17" results against raw data, matched exactly after fixing one own bug; escalation itself not yet tested) | |
 | [2026-10-30](2026-10-30.md) | 8h total — LogPrompts Research 4h (10:30–14:30), PaliVerse 4h (15:30–19:30) | LogPrompts Research (pre-registered go/no-go test for log-probabilities in Shindan QE: GO for DeepSeek confidence scores, NO-GO for Gemma, judge adds no value — decision left to the project owner), PaliVerse (crash-safe checkpointing + autosave ahead of a 15,000+ segment run; fixed a real `temperature`-parameter SDK break affecting Sonnet/Haiku) | |
+| [2026-11-02](2026-11-02.md) | 4h explicit (mini_rag, 17:30–21:30) + an untimed LogPrompts Research block | LogPrompts Research (Shindan profile 17 follow-up stats: per-category P/R/F1, real annotated-error counts exposing thin sample sizes, escalation framing — decision still open), mini_rag (new work: Azure RAG hosting migration — found live credentials committed in a config file, flagged for rotation; provisioned a Postgres+pgvector server after working around a real Azure regional-capacity issue, then stopped it to control cost) | No entries found for 2026-10-31/2026-11-01 (weekend); LogPrompts time not given in its source log |
 
-**Total hours logged so far: 163.5h** (10h on 2026-10-07, 9h on
-2026-10-08, 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13, 7h
-on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on 2026-10-19,
-12h on 2026-10-20, 12.5h on 2026-10-21, 8h on 2026-10-22, 8.5h on
-2026-10-23, 9h on 2026-10-26, 13h on 2026-10-27, 8h on 2026-10-28, 8h
-on 2026-10-29, 8h on 2026-10-30).
+**Total hours logged so far: 167.5h explicit** (10h on 2026-10-07, 9h
+on 2026-10-08, 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13,
+7h on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on
+2026-10-19, 12h on 2026-10-20, 12.5h on 2026-10-21, 8h on 2026-10-22,
+8.5h on 2026-10-23, 9h on 2026-10-26, 13h on 2026-10-27, 8h on
+2026-10-28, 8h on 2026-10-29, 8h on 2026-10-30, 4h on 2026-11-02),
+plus an untimed LogPrompts Research block on 2026-11-02 not counted
+into this total (see that day's file).
