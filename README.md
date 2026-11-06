@@ -39,11 +39,12 @@ Source project repos:
 | [2026-11-03](2026-11-03.md) | 7h total — PaliVerse 1.5h (11:30–13:00) + 1h (14:00–15:00), PaliVerse RAG 4.5h (15:30–20:00) | PaliVerse (progress-bar reconnect feature; a storage review found the VM at 90% disk usage, followed by real cleanup — freed disk from 90%/6.5GB free down to 80%/13GB free), PaliVerse RAG (confirmed real Azure nonprofit-credit limits and spend breakdown, a start/stop cost-discipline framework, and a multi-consumer schema migration applied live to Azure) | |
 | [2026-11-04](2026-11-04.md) | 9h total (10:30–19:30) — PaliVerse RAG | PaliVerse RAG (data-migration blocker correctly flagged rather than guessed, then resolved; real ingestion run, 3,765 chunks, $0.083; found and fixed a silent schema-version regression; reconstructed the project's missing system prompts and ran the first real demo validation — caught the same `temperature`-SDK class of bug independently, promising early results) | |
 | [2026-11-05](2026-11-05.md) | 8h total — PaliVerse RAG 4h (10:30–14:30) + 4h (16:30–20:30) | PaliVerse RAG (demo validation confirmed across all 6 questions, including a real grounding-safety-net case working as designed; an embedding-model benchmark request evaluated and deferred — no GPU on this machine, hosted inference blocked; real full-canon sizing estimate (~5.6GB, ~$2.10 embedding); full Root/Commentary/Sub-commentary migration scoped and test-run, ~4.5h projected for the full chunk-build) | |
+| [2026-11-06](2026-11-06.md) | 10h total — PaliVerse RAG 4h (10:30–14:30) + 6h (16:30–22:30) | PaliVerse RAG (full-canon ingestion completed for real — 244,804 chunks, ~5GB, ~$6.24 embedding cost, two real bugs found and fixed mid-run; post-migration verification caught a serious retrieval bug hard-scoping search to one text, fixed, one narrower ranking miss remains; started a whole-canon pure-embedding passage-linking benchmark for info-tab generation, 60-80% recovery so far, left running overnight) | |
 
-**Total hours logged so far: 195.5h** (10h on 2026-10-07, 9h on
+**Total hours logged so far: 205.5h** (10h on 2026-10-07, 9h on
 2026-10-08, 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13,
 7h on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on
 2026-10-19, 12h on 2026-10-20, 12.5h on 2026-10-21, 8h on 2026-10-22,
 8.5h on 2026-10-23, 9h on 2026-10-26, 13h on 2026-10-27, 8h on
 2026-10-28, 8h on 2026-10-29, 8h on 2026-10-30, 8h on 2026-11-02, 7h
-on 2026-11-03, 9h on 2026-11-04, 8h on 2026-11-05).
+on 2026-11-03, 9h on 2026-11-04, 8h on 2026-11-05, 10h on 2026-11-06).
