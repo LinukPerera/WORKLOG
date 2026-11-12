@@ -1,0 +1,1074 @@
+Time Sheets
+
+07/10/2026
+
+PROJECT 1: PaliVerse Mistranslation Finder Web App 
+Net time: 6 hrs
+Summary: Prepared the existing web tool to go live securely at aicorrector.paliverse.org.
+Tasks:
+* Reviewed the server and code, and found security gaps on the server.
+* Planned the go-live steps, avoiding changes that could lock us out of the server.
+* Built a login check so only approved PaliVerse users can open the tool.
+* Made each correction traceable to the user who made it.
+* Moved exposed passwords and keys out of the code into a protected file.
+* Fixed old Windows file locations and moved the data files into the project.
+* Connected the login check to the WebST system using details from their team.
+* Set up the live server: automatic restart, firewall and secure HTTPS.
+* Uploaded the code to a new GitHub repository.
+* Wrote a handover guide for future engineers.
+* Investigating a bug where approved users are sent back to the login page. Added temporary logging to confirm.
+* 30 Minute meeting with Mr. Costas.
+
+PROJECT 2: LLM Translation Experiment, Tikka 
+Net time: 1.5 hr
+Summary: Prepared a fair test comparing four AI providers on translating Book 1, Chapter 1. No paid requests sent yet.
+Tasks:
+* Fixed a labeling error affecting about 1,700 sentences and checked it against all 298,385 sentences.
+* Connected the corrected reference data to the Tikka translation script and confirmed the prompts contain correct examples.
+* Stored the four provider keys securely
+* Researched current pricing for all four providers and made price calculation algorithm.
+* Set up the test so answers already known for the test chapter are hidden from the AIs. Fixed a leak found during checking.
+* Prepared all 149 prompts and estimated the cost per provider.
+* Wrote full documentation of the method and costs.
+
+PROJECT 3: LogPrompts Research 
+Net time: 2.5 hrs
+Summary: Designed a way to use the AI's confidence in a translation to decide which translations need human review.
+Tasks:
+* Defined the workflow: high-confidence translations pass automatically, low-confidence ones go to a human editor.
+* Compared three ways of measuring confidence.
+* Outlined the technical design for collecting the confidence scores.
+* Added a safeguard so a score is never matched with text that was edited later.
+* Planned testing against benchmark data and past human edits to confirm real errors are caught without false alarms.
+
+Total: 10 hrs
+
+08/10/2026
+
+Work on the web-app
+
+Round 1 — server-side CORS/endpoint probing (via curl):
+1. Unauthenticated GET to stage.paliverse.org/wp-json/webst/v1/user-access → 200, {"logged_in":false,"allowed":false,"user":null}.
+2. Same request with an Origin: https://aicorrector.paliverse.org header → confirmed proper CORS headers present (access-control-allow-origin matching our origin, access-control-allow-credentials: true).
+3. OPTIONS preflight on that endpoint → succeeded with correct CORS headers. Conclusion: CORS was fine on the main check endpoint.
+4. Checked /wp-json/ root discovery on both stage.paliverse.org and www.paliverse.org → found they report different url values, suggesting separate WordPress installs.
+5. Confirmed the webst/v1/user-access endpoint also exists on production, same unauthenticated response shape.
+6. Hypothesis formed: stage and production are separate logins — explains the redirect if the user logged into production only.
+
+Round 2 — building server-side diagnostic tooling (since only the browser has the real session):
+7. Added logDebug() in static/auth-gate.js to POST the raw WordPress response to a new backend endpoint before deciding pass/fail, plus a new POST /api/auth/debug-log route in server.py that appends to a local gitignored log file.
+8. First real-login test after deploying this → nothing was logged at all.
+9. Diagnosed why: the debug-log fetch was being cancelled by the browser's redirect (window.location.replace()) before it finished. Fixed by adding keepalive: true.
+10. Redeployed, retested → still nothing logged. 
+11. Tested the debug-log endpoint directly via curl to isolate frontend vs. backend → got a 500 OSError: Read-only file system error.
+12. Real bug found: the systemd unit's ProtectHome=read-only hardening was silently blocking all disk writes under /home/linuk, including the app's own output/, data/, keys/ — had been broken since go-live (audit trail, saved searches, write-back backups, lemma rebuild all silently failing). Fixed by adding ReadWritePaths= to the systemd unit, service restarted.
+13. Retested the debug-log endpoint via curl → confirmed working now.
+14. User logged in again (three attempts) → captured real data each time: {"nonce_sent": false, "http_status": 200, "body": {"logged_in": false, "allowed": false, "user": null}} — confirming no network/CORS error, just a clean "not logged in" from stage, consistent with the separate-login hypothesis.
+
+Round 3 — WebST's first reply and testing their suggested nonce endpoint:
+15. WebST explained staging needs a maintenance-mode-bypass account, and gave a nonce URL: admin-ajax.php?action=rest-nonce.
+16. Tested that URL (both stage and production) unauthenticated via curl → 400, body "0" (plain text, not JSON).
+17. Tested OPTIONS preflight with our Origin header on stage → 403, no CORS headers at all.
+18. Tested the actual GET (not preflight) with Origin header → still no access-control-allow-origin header.
+19. Updated auth-gate.js to use the real URL and parse plain text correctly, flagging the CORS gap in comments.
+
+Round 4 — digging deeper to see if we could self-serve a fix:
+ 20. Asked the user to check cookie Domain attributes in DevTools for both logins. Result: stage's cookies scoped tightly to stage.paliverse.org; production's wordpress_logged_in_* cookie appeared (per the user's read) possibly domain-wide.
+21. Tested production's admin-ajax.php nonce endpoint the same way (18–19 above) → identical result, no CORS support there either.
+22. To test the "maybe our server can receive the cookie directly" theory, added a new temporary GET /api/auth/debug-cookies route (returns cookie names only, never values).
+23. Restarted the service, had the user visit that URL directly while logged into production → result: only _ga, _ga_BN94YP784Q, and our own pv_sid arrived. The WordPress login cookie never reached our backend — disproving the server-side-proxy workaround entirely.
+24. To settle whether the nonce requirement was real or just theoretical, had the user do a plain same-origin browser navigation (not a fetch, so no CORS involved at all) directly to https://www.paliverse.org/wp-json/webst/v1/user-access while logged into production.
+25. Result: {"logged_in":false,"allowed":false,"user":null} — conclusively confirmed the nonce is genuinely required and enforced, even with a valid, properly-attached cookie.
+
+Total: 9 hrs
+
+09/10/2026
+
+Working hours: 11:30 to 19:30 and checks on the program run completion from 19:30 to 21:30
+
+LOGPROMPTS RESEARCH (Net time: 6 hrs + 2 hrs on and off)
+
+Summary: Built a way to test whether required terminology unfairly lowers the system's confidence scores, and set up the server the research needs so the study can now run.
+
+Tasks:
+11:30 to 14:30 (3 hrs):
+* Identified a risk that the confidence checks could wrongly flag correct translations that use required glossary terms, and wrote up a plan to measure it.
+* Found and downloaded a suitable public dataset.
+* Built tools that find the required terms inside each translation, including a fix so segments with several required terms are all handled.
+* Built tools that compare confidence scores for required terms against the rest of the sentence, and against the same translation made without required terms.
+* Checked the new tools against the real data and found a genuine example of exactly the case being studied.
+* Ran the full automated test suite and all tests passed.
+16:30 to 19:30 (3 hrs):
+* Research server selection, build and setup
+* Developed some software needed for the setup from scratch since some tools were not compatible with the hardware.
+* Fixed a startup problem where the server asked for more memory than the machine had free.
+* Started the server privately on the machine, ran a full trial, and confirmed it scores correct translations higher than faulty ones as expected.
+* Wrote a setup guide so the server can be rebuilt without repeating the investigation.
+19:30 to 21:30 (2 hrs on and off):
+* Server follow up checks till the run was completed.
+* Carried out follow up checks confirming the server stayed up with steady memory use and nothing left to fix.
+
+PALIVERSE AI CORRECTOR (Net time: 2 hrs)
+
+Summary: Made the live AI Corrector site safer and clearer by switching it to its own dedicated access account and renaming the database options so users know which one they are working in.
+
+Tasks:
+14:30 to 16:30 (2 hrs):
+* Meeting with Mr. Costas
+* Access account change, screen labels and go live checks
+* Replaced the shared access key, which belonged to a personal account, with a key from a new dedicated test account, and confirmed it works.
+* Renamed the database options on screen to Test Database, PaliVerse Test Database and Live PaliVerse Database.
+* Deployed the changes to the live site and confirmed everything loads correctly.
+* Confirmed with a fresh user test that corrections.
+
+Total: 8-9 hrs
+
+12/10/2026
+
+Working hours: 11:30 to 20:00
+
+LOGPROMPTS RESEARCH (time: 8 hrs)
+
+Summary: Completed the feasibility study on real data and presented findings to Alpha.
+
+Tasks:
+11:30 to 20:00 (8 hrs): 
+
+* Measured real scoring speed and found the full datasets would take 15 to 20+ hours, so planned large but limited samples instead.
+* Added parallel processing to the three scoring scripts, tested different settings and chose 8 parallel requests for about a 1.8x speedup.
+* Ran the main test on 1,500 sample translations (English to German benchmark), with about 1,430 scored successfully.
+* Wrote a new evaluation script to compare the model's confidence scores against human quality ratings.
+* Found the terminology test failed on 90 to 100 percent of German source sentences, traced the cause, and switched to English to Czech data with 0 percent failures. Documented this as a finding.
+* Ran the terminology test, scaled it down from 2,500 to 400 pairs to finish today, and confirmed a suspected stall was only a misleading progress display. Got 209 usable results.
+* Wrote the full feasibility report with methods, results and limitations.
+* Confirmed all 21 automated tests pass, then committed and pushed all work.
+* Built a script that produces an audit data file with every scored translation, detailed breakdowns of 7 chosen example cases, and a translation memory file with 1,709 entries.
+* Found and fixed a bug that pulled in the full 19,725 row dataset instead of the sample, cutting the files from 19MB to 2MB.
+* Wrote a formal review document so every claim in the study can be traced to its source.
+* Pushed everything to the project repository.
+* Created a presentation on findings
+* Meeting with Mr. Inacio
+
+PaliVerse Mistranslation Finder Web App and LLM Translation Experiment (time: 0.5 hrs)
+Tasks:
+* Meeting with Mr. Costas regarding next steps 
+
+Total: 8.5 hrs
+
+13/10/2026
+
+Working hours: 11:30 to 15:30 and 16:30 to 19:30
+
+LOGPROBS RESEARCH (Net time: 4 hrs)
+
+Summary: Checked which of our translation quality scoring methods can run on OpenAI now that we have an API key, then planned and tested the ones that can.
+
+Tasks:
+11:30 to 15:30 (4 hrs): 
+* OpenAI API compatibility research, experiments plan and live key testing
+* Listed every scoring approach from our project material and checked each against OpenAI's official documentation.
+* Confirmed that OpenAI no longer offers the feature our main approach depends on (it was shut down on 28 September 2026), so that approach and candidate ranking cannot run on OpenAI.
+* Confirmed that the scoring methods which work while the model is producing its own translation are still available on OpenAI.
+* Wrote up the full list of approaches, sources and verdict in a compatibility document.
+* Reviewed all seven demo scripts in the reference project line by line and corrected one script that had been wrongly marked as compatible, with an explanation of how it can be adapted to work.
+* Checked the second breakdown of the toolkit (the eight layers) and found a clear rule
+* Set up the OpenAI software libraries in the project and wrote a short test script that scores a correct and a deliberately wrong German translation.
+* Wrote a plan for three experiments, ranked by how directly they compare with our earlier results, with the top priority being a head to head comparison on the same 1,500 human checked sentences used in the earlier study.
+* Checked the plan against all eight toolkit layers, found one missing and one loosely described, and fixed both with a full coverage table.
+* Ran the test live: both target methods work. The model flagged its own weak word choice, and the yes or no checker gave a very clear verdict on correct versus wrong translations, much sharper than the earlier study.
+* Tested five further OpenAI options live: several answers in one request works (cuts experiment cost), the newer Responses interface does not return the scores, nudging the yes or no answer works without forcing a wrong verdict, streamed responses work, and the old shut down feature is confirmed unavailable on our account.
+* Updated both documents with these results and confirmed gpt-4o as the working default model.
+
+TIKKA TRANSLATION PROCESS (Net time: 3 hrs)
+
+Summary: Fixed and reviewed the four AI translation experiment (S0101), then built and launched the live run that sends the translations to all four AI providers.
+
+Tasks:
+16:30 to 19:30 (3 hrs): 
+* S0101 experiment review, dry run build and retry
+* Fixed missing experiment logs: the scripts now save their full output to a logs folder every run, and the 7 October results were recovered and saved there.
+* Re-ran the dry run with the new logging: all 149 prompts produced, cost figures identical to 7 October, confirming nothing else changed.
+* Final estimated costs after all fixes: Claude $19.65, Kimi $10.80, OpenAI GPT-6 Astra $36.01, Meta unknown.
+* Dry run reviewed and approved to proceed to the real run.
+* Built the live script that sends the work to all four providers (Claude, Kimi, OpenAI and Meta), using Meta's discounted tier as previously agreed.
+* Tested each provider on one unit first and fixed two problems cheaply: OpenAI needed a different setting name, and Kimi's content filter blocks one dictionary entry, so Kimi will skip those units rather than us changing the data.
+* Launched the full run: Claude and OpenAI completed all 149 units cleanly.
+* Stopped the run when Kimi and Meta answers were being cut off at the length limit, raised the limit, and added a resume option so only missing or cut off units are redone.
+* Started the retry for Kimi and Meta only. Still running at end of day.
+
+Total: 7 hrs
+
+14/10/2026
+
+Working hours: 11:30 to 19:30
+
+LogPrompts Research Alpha (Net time: 1.5 hrs)
+
+Summary: Ran a 100-sentence pilot testing OpenAI models as automatic judges of translation quality.
+
+Tasks:
+11:30 to 13:00 (1.5 hrs): 
+* Judge pilot, models tested and calibration check
+* Selected 100 pilot sentences for testing.
+* Checked which OpenAI models the account can actually use and tested gpt-4o-mini, gpt-4o, gpt-4.1, gpt-5 and o4-mini. gpt-5 and o4-mini refuse to return the confidence data we need, and gpt-5-chat-latest is listed but retired.
+* Built the scoring script for Experiment 1 and ran all 100 sentences through the three working models.
+* Found and fixed a bug in the evaluation script, fixed then reran the evaluation.
+* Updated the documentation.
+* Tested three newer models: gpt-6.1-sol, gpt-5.4 and gpt-5.1-chat-latest.
+* Rewrote the scoring step so it adjusts its settings automatically when a model rejects them, instead of hard-coding rules for each model version.
+* Investigated why the four models' headline scores looked so similar.
+* Split the scores by error severity.
+* Updated the evaluation script to report the severity-split scores and the yes/no tendency as standard, and regenerated the tracking file for all four models. 
+* 
+
+PaliVerse AI Corrector (Net time: 1 hr)
+
+Summary: Meeting.
+
+Tasks:
+14:00 to 15:00 (1 hr): 
+* Meeting with Mr. Costas and Ven. Banthe Thero
+
+
+Tikka translation process (Net time: 4.5 hrs)
+
+Summary: Collected and compared the results of the test.
+
+Tasks:
+15:00 to 19:30 (4.5 hrs): 
+* S0101 live-run results, 6-metric quality comparison, cost accounting
+* Combined each provider's 149 separate result files into one.
+* Plan and built a quality comparison using 6 measures.
+* Installed and setup the analysis tools this needed.
+* Tested on 5 units first.
+* Then ran the full set of 586 results.
+* Recorded and updated the documentation.
+
+Total: 7 hrs
+
+15/10/2026
+
+Working hours: 11:30 to 19:30
+
+LogPrompts Research Alpha (Net time: 5 hrs)
+
+Summary: Ran a second round of the AI judge tests, completed the remaining experiments and wrote up the OpenAI findings and the Part 2 presentation guide.
+
+Tasks:
+11:30 to 14:30 (3 hrs):
+* Judge round 2, remaining experiments and consolidated report
+* Checked which planned research areas still had no real results.
+* Dropped the two weaker models and kept gpt-4.1 and gpt-4o-mini.
+* Selected a new, separate set of 200 sentences for a second test round.
+* Ran both models on the new set and combined the results with the first round.
+* Confirmed the judge approach holds up, while one earlier advantage turned out to be smaller than it looked.
+* Tested the three remaining unchecked methods. None showed useful results.
+* Restarted the local AI server, which had crashed again.
+* Wrote a single report bringing together all the OpenAI findings, with a recommendation.
+* Ran 2 experiments for external judge based algorithms
+
+17:30 to 19:30 (2 hrs):
+* Used experiment outputs to make needed metrics
+* Made presentation for Alpha 
+* Prepared data and samples for presentation
+
+Tikka translation process (Net time: 2 hrs)
+
+Summary: Closed the Tikka evaluation and started planning the evaluation of the chapter explanations.
+
+Tasks:
+15:30 to 17:30 (2 hrs):
+* Code saved and environment set up (from old machine)
+* Saved the new mapping table code to a separate branch for review before it goes into the main version.
+* Set up the chapter explanations (Info Tabs) project for evaluation.
+* Restored data from old experiments (txt files).
+
+Total: 7 hrs
+
+16/10/2026
+
+Working hours: 11:30 to 20:30
+
+LogPrompts Research Alpha (Net time: 4.5 hrs)
+
+Summary: Updated the Part 2 presentation, prepared the results and terminology for the Alpha meeting.
+
+Tasks:
+11:30 to 14:30 (3 hrs):
+* Pushed the latest Part 2 presentation update.
+* Data review to make documentation and needed calculations
+* Created the needed graphs
+* Research on future project direction and use cases for Alpha
+* Ran correlation calculations and supporting statistics.
+* Completed documentation for Alpha.
+
+15:30 to 17:00 (1.5 hrs):
+* Presentation update and meeting preparation
+* Meeting with Mr. Inacio
+
+
+Tikka translation process (Net time: 2.5 hrs)
+
+Summary: Added two more AI providers to the S0101 translation comparison and corrected an error in the Meta cost figures.
+
+Tasks:
+17:00 to 20:30 (3.5 hrs):
+* Added DeepSeek and the Meta Contributor tier to the comparison.
+* Found Meta pricing error and did re calculation.
+* Corrected the cost tables and conclusions in the reports and the pricing in the run script.
+* Tested the chosen models with small trial runs before the full run.
+* Updated the run, combining and analysis scripts for the new providers, so a partial re-run never overwrites existing results.
+* Started the full run for both new providers.
+
+Total: 8 hrs
+
+19/10/2026
+
+Working hours: 10:30 to 20:30
+
+Tikka translation process (Net time: 7 hrs)
+
+Summary: Recorded and compared the results of the translation provider test, and checked whether Google’s AI models could be added as another provider.
+
+Tasks:
+10:30 to 14:00 (3.5 hrs):
+* Compiled results from new models
+* Ran Similarity for new models
+* Ran Fluency for new models
+* Recorded the results documentation.
+* Built one final comparison table covering quality, readability, similarity, cost and speed for the remaining providers.
+17:00 to 20:30 (3.5 hrs):
+* Added Google AI models as a seventh provider
+* Set up access to Google’s Gemini and Gemma models and tested each available model.
+* Found that the free Google account limits how much text can be sent, which is too small for our full translation prompts.
+* Prepared the test script so Google can be run as soon as a paid account is available.
+* Info Tabs evaluation DB and code set-up from previous environment.
+
+LogProbs Research Alpha (Net time: 3 hrs)
+
+Summary: Started the next phase of the research, testing which types of translation errors the AI checking method is best at catching.
+
+Tasks:
+14:00 to 17:00 (3 hrs):
+* Error type analysis
+* Found and verified a public dataset that labels each translation error by type, such as accuracy, fluency, style and terminology.
+* Built scripts to download this data and match it with our existing results.
+* Found and fixed two data matching problems, and added tests to prevent them from coming back.
+* Found that the AI checking method is best at catching accuracy errors and weaker but still useful for fluency and style errors.
+* Confirmed the older probability-based method performed no better than chance on every error type.
+* Wrote up the results and saved the work.
+* Noted the move of this experiment to a new, more powerful computer to run larger AI models.
+
+Total: 10 hrs
+
+20/10/2026
+
+Working hours: 10:30 to 22:30
+
+Tikka translation process (Net time: 8 hrs)
+
+Summary: Finished the Google Gemini translation run, then restarted the Info Tabs (chapter explanations) experiment and ran it for Chapter 1 across four AI providers, including a fluency test of the results.
+
+Tasks:
+12:30 to 20:00 (7.5 hrs):
+* Google Gemini translation run
+* After the Gemini account was given $20 of billing, a real test call was sent with a full translation prompt to confirm the earlier usage limit was lifted.
+* Counted the exact amount of text in all 149 translation prompts at no cost, and ran 8 sample translations to measure output length. Estimated the full run cost.
+* Ran the Gemma access test again and confirmed Google only offers Gemma on the free plan, so paying does not help. Recorded it as a dead end for this experiment.
+* Ran the full 149-unit Gemini translation
+* Ran the quality analysis on the Gemini translations and added Gemini to the final comparison table. 
+* Info Tabs experiment: finding the data
+* Info Tabs experiment: building the pipeline
+* Made a working copy of the original explanation generator and pointed it at the local database. The dry run test found 60,843 units that can be processed.
+* Ran a 3-unit live test with Claude Haiku (cost $0.0097) to verify operation of script.
+* Set up a full working copy with all file paths and database settings pointed to the VM.
+* Wrote a dry-run script that builds every real request . The dry run test then passed for all 149 Chapter 1 units.
+* Measured the chapter commentary (60,031 tokens) and priced the run: caching is about 9 times cheaper.
+* Researched whether Meta's model supports caching text.
+* Wrote a shared script that runs the Info Tabs generation on Gemini, DeepSeek, Meta Contributor and OpenAI using the same request building code as the Claude version. The dry run test passed for all four.
+* Ran a 1-unit live test on each provider and fixed an OpenAI setting error found during the test.
+* Ran a caching test by sending the same large text twice to each provider. Only DeepSeek reused it (about 84 percent). Meta, OpenAI and Gemini did not.
+* Re-estimated the costs from these results and dropped OpenAI, since it would have cost about $113.
+* Added parallel running and the ability to resume after an interruption to the shared script, which cut a run of several hours per provider down to minutes.
+* Info Tabs experiment: live runs for Chapter 1
+
+22:00 to 22:30 (0.5 hrs):
+* Organised the outputs by provider, chapter and unit.
+* Flagged that the Gemini cost figures.
+* Info Tabs results and fluency test
+* Collected each provider's 149 explanations into one readable file per provider and saved them to the results folder.
+* Ran the fluency test on all 596 explanations, using a readability score, a reading-difficulty score and an AI-rated fluency score.
+* Rewrote the scoring script partway through so it records the real cost and time of every call and saves progress as it goes. Re-ran it cleanly for all 596 explanations at $1.64 total in 10.2 minutes.
+* Found that all four providers write equally fluent text (8.95 to 9.00 out of 10). The real difference is readability: two providers read at college level and two at graduate level.
+* Combined the fluency, cost, time and text reuse results into one comparison table, and wrote up the method and limitations in the evaluation report.
+
+LogPrompts Research Alpha (Net time: 4 hrs)
+
+Summary: Moved the experiment to a new Windows computer with local AI models, then used the lab's own DeepSeek model to test how well it catches each type of translation error.
+
+Tasks:
+10:30 to 12:30 (2 hrs):
+* Handover to the new computer
+* Wrote two handover documents: a short guide that loads automatically in every new session, and a full handover covering the project history, results, current status, setup notes, file list and next steps.
+* Ran the pytest test suite (29 of 29 tests passed) and saved the work.
+* Setup New VM
+
+20:00 to 22:00 (2 hrs):
+* Setup and local AI judge testing
+* Downloaded the project to the new computer and installed its tools.
+* Fixed an installation error caused by the app's folder restrictions.
+* Ran pytest test suite again, passed all tests.
+* Connected to the lab's own DeepSeek model and followed its usage rules
+* Wrote these rules into the project guide.
+* Ran the scoring test, which showed that the "score an existing translation" method gives impossible results on this server, so that method cannot be used here.
+* Ran the Yes/No and Percentage judge tests, which worked correctly. Noted that both judges wrongly accepted untranslated text as correct.
+* Wrote a scoring script that asks the model Yes/No and Percentage questions and saves the full answer probabilities, so new measurements need no new requests.
+* Wrote an evaluation script, a statistical comparison script, a sub-category analysis script, a script that picks a balanced sample across error types, and a script that runs the evaluation on that sample. Added 7 new tests.
+* Ran the pilot evaluation on 300 segments. The local model matched the hosted OpenAI judges (0.749 against 0.736 for GPT-4.1).
+* Found and fixed a bug where one whole error sub-category was missing from the data because of formatting tags in the source text.
+* Ran the evaluation on a new balanced sample of 445 segments.
+* Chose the Yes/No method as the main local judge, since the Percentage method was clearly worse on fluency and terminology in the larger sample.
+* Updated the results report, handover document and setup guides. The pytest test suite passed (37 of 37).
+
+Total: 12 hrs
+
+21/10/2026
+
+Working hours: 10:30 to 17:30 and 18:00 to 23:30
+
+LogPrompts Research Alpha (Net time: 12 hrs)
+
+Summary: Wrote a full presentation guide for the investigation, built the presentation and presented it to Alpha, then wrote the technical plan and timeline for a joint project proposal with Alpha on using confidence scores to improve Shindan.
+
+Tasks:
+10:30 to 13:00 (2.5 hrs):
+* Presentation guide for the full investigation
+* Wrote a complete presentation guide covering the whole investigation from the first question on 8 October to the current state on 20 October. For every test it explains what was done, why, what was measured, the result and the decision that followed.
+* Covered the first local study and its nine-signal test (scores of 0.49 to 0.53, close to random guessing, on 1,426 segments), the terminology test, and the two technical problems found with text alignment.
+* Covered the move to OpenAI: the compatibility screening, the Yes/No judge rounds 1 and 2 and the pooled results (including the GPT-4o-mini versus GPT-4.1 reversal), the eight-layer scoreboard, and Experiments 2 and 3.
+* Covered Phase 3: where the error category data came from, how it was joined, the three bugs found (including the Omission fix), and the OpenAI judge results by category.
+* Covered the local DeepSeek work: the usage rules, both smoke tests, the Percentage judge, the full comparison of all signal types with paired bootstrap statistics, the balanced sample design and its results.
+* Added a 22-row decision log (date, decision and evidence), a table of cases where the headline number was misleading, caveats, next steps and a list of sources.
+* Added a new "How we measured" section after feedback that the talk must explain the metrics. It explains AUC, Pearson and Spearman scores in plain terms, why each was used, what each can and cannot tell us, the supporting statistical tests (paired bootstrap, Wilcoxon, binomial test, chrF, confusion matrix), and examples where the choice of metric changed a conclusion.
+* Changed the slide plan from a 14-slide outline to a chapter-by-chapter flow of about 86 slides plus an appendix, which can be split across several sessions.
+* All figures were taken from the existing reports and result files. No new experiments were run for this task.
+
+13:30 to 17:30 (4 hrs):
+* Building the presentation and presenting to Alpha
+* Worked with the data and built the full investigation presentation from the morning's guide: 86 main slides plus an appendix (97 slide parts in total), with a slide-by-slide walkthrough document.
+* Checked that the presentation file opens correctly and that neither file contains any passwords or access keys, then saved both to the project repository.
+* Met with Alpha and presented the full investigation. Discussed ways to combine Alpha's Shindan quality checking system with this work.
+
+18:00 to 23:30 (5.5 hrs):
+* Project proposal with Mr. Antonio (Alpha): confidence-based checking for Shindan
+* Wrote the Technical Implementation section and the project timeline for the proposal "Extending Shindan with Log-Probabilities", written together with Mr. Antonio from Alpha.
+* The goal is to cut down the errors Shindan reports that are not real, without causing it to miss real errors, by giving each reported error a confidence score and sending doubtful cases to a stronger AI model for a final decision.
+* Designed the main method: the confidence score is read from the answer Shindan already produces, so no extra AI request is needed, and it is adjusted per error category against human-checked examples so that the score can be trusted.
+* Supported the plan with this project's own test results (0.749 overall, about 0.80 for mistranslations, about 0.60 for terminology) and clearly stated that Shindan's own output has not been tested yet.
+* Designed the checking rule for each error category: keep confident results, and send doubtful ones first to a mid-level model and then to a stronger model, with DeepSeek, Gemma and others as candidates to be chosen by testing.
+* Added a safety rule so a reported error is only removed when the second check is clearly sure. If even the stronger model is unsure, the case goes to a human editor.
+* Calculated how many human-checked examples are needed per category to set the cut-off points reliably (about 150 to 300 per category).
+* Added fallback plans so that any category where the method does not work keeps Shindan's current results, meaning the system can never be worse than today.
+* Designed the evaluation using Alpha's 10,000-segment human-checked test set (English-German, English-Spanish, English-Russian and Chinese-English), comparing Shindan alone, the new pipeline, random checking and checking chosen by existing quality tools (CometQE and MetricX).
+* Estimated how much data is available per category and flagged one category that is likely too small to test properly.
+* Reduced the timeline from an initial 5 to 6 weeks to about 2 weeks plus a 1-week buffer, based on reusing code from earlier experiments and the pace of the project so far.
+* Flagged risks and sent open questions back to Alpha, such as whether Shindan already returns the confidence data and how the test set is labelled.
+* Saved the Technical Implementation section to the proposal document in the repository, and drafted suggested changes to the Evaluation, Timeline and Expected Results sections in two working files for review.
+
+PaliVerse Segment Edit History (Net time: 0.5 hrs)
+
+Summary: Checked the PaliVerse production database to find translation segments that have been edited many times, and compared each one's original text with its current text.
+
+Tasks:
+13:00 to 13:30 (0.5 hrs):
+* Segment edit history investigation
+* Set up a Python environment with a database connection tool and connected to the production database with a read-only account.
+* Found the two tables that record editing: one for each editing action (6,707 rows) and one for each text change (67,125 rows).
+* Checked the data before analysing it: only published changes were counted, confirmed each segment belongs to a single language, and confirmed imported changes contain real before and after text.
+* Wrote a Python script that, for each segment, finds the original text, the current text, the number of published edits and the users who made them.
+* Wrote a plain SQL version of the same report and confirmed it gives exactly the same results row by row.
+* Results: 42,655 segments have been edited at least once, 1,576 have been edited 5 or more times and 1,079 have been edited 6 or more times. The most edited segment has 21 edits over about six weeks by 3 different users.
+* The read-only account cannot see user names, so users can only be shown as ID numbers (7 IDs found). Access to the user table or a list of names for these IDs is needed to show names.
+
+Total: 12.5 hrs
+
+22/10/2026
+
+Working hours: 10:30 to 14:30 and 15:30 to 19:30
+
+PaliVerse Segment Edit History (Net time: 7.5 hrs)
+
+Summary: Measured and sorted every published edit made to PaliVerse translations, then used AI to classify the types of translation errors those edits fixed across 38,836 segments and analysed the results to find the biggest problems in the translation process.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Meeting with Mr. Costas.
+* Edit statistics and classification
+* Pulled all 68,174 published edits from the live production database.
+* Wrote a script that measures every edit.
+* Added up the results for each segment across its full edit history.
+* Editor names added after meeting with Mr. Costas
+* Error classification design and tests
+* Designed a list of translation error types (7 main types and 19 sub-types, based on the MQM industry standard), covering meaning errors, mistranslation, grammar, terminology, style and offensive content.
+* Tested the cheapest option first, a small local model.
+* Ran a 40-segment test with Claude Haiku.
+* Updated the prompts and code to work better with Haiku.
+* Ran a 200-segment validation test before the full spend.
+* Created a new private repository for this analysis and saved the scripts, database report, error type list and write-ups.
+* Full classification run.
+* After approval, sent all 38,836 segments to Claude in 8 batches using the discounted batch service. 
+* 
+16:00 to 19:30 (3.5 hrs):
+* Detailed analysis of the classification results, four reports drafted.
+
+LogPrompts Research Alpha (Net time: 0.5 hrs)
+
+Summary: Agreed with Mr. Antonio how to handle cases where the AI models disagree, to reduce wrong flags and missed errors, and updated the project documents.
+
+Tasks:
+15:30 to 16:00 (0.5 hrs):
+* Documentation update with Mr. Antonio
+* Discussed with Mr. Antonio and decided how to treat cases where the AI models disagree with each other, so the system raises fewer false alarms and misses fewer real errors.
+* Updated the project documentation with these decisions.
+
+Total: 8 hrs
+
+23/10/2026
+
+Working hours: 10:30 to 19:30 (8.5 hrs, with a break from 13:00 to 13:30)
+
+PaliVerse Segment Edit History (Net time: 2.5 hrs)
+
+Summary: Worked with the data and made needed analytics for the report.
+
+Tasks:
+10:30 to 13:00 (2.5 hrs):
+* Analysis for the report
+
+Tikka translation process (Net time: 5 hrs)
+
+Summary: Adopted the new prompt and ran it.
+
+Tasks:
+13:30 to 15:30 (2 hrs):
+* Adopted new prompt
+* Wrote a dry run script that builds every request for Chapter 1
+* Made new script that handles the new prompt and sends it to API
+* Reviewed the dry run results and ran the API script.
+
+16:30 to 19:30 (3 hrs):
+* Live runner, fixes and full chapter run
+* Wrote the live run script for DeepSeek, Claude and Meta. It works through the segments strictly in order, as the brief requires: each request includes the explanations already written for earlier segments so the AI does not repeat itself, and it moves forward by however many segments the AI chose to combine.
+* Built the brief's automatic quality checks into the script.
+* Ran test calls and fixed five problems.
+* Ran the full chapter (all 149 segments) on all three providers.
+* Reviewed the check failures.
+* Finalised and organised results.
+
+LogPrompts Research Alpha (Net time: 1 hr)
+
+Summary: Met with Alpha to agree the first steps for testing the escalation plan.
+
+Tasks:
+15:30 to 16:30 (1 hr):
+* Meeting with Alpha and talking points
+* Met Mr. Antonio and Mr. Dhanush (Alpha) about the implementation and the first steps to analyse the data and Shindan's performance, in order to test the escalation plan. We agreed a KPI: keep refining until the cut-off scores are stable.
+
+Total: 8.5 hrs
+
+
+26/10/2026
+
+Working hours: 10:30 to 20:30 (9 hrs, with a break from 13:00 to 14:00)
+
+PaliVerse Segment Edit History (Net time: 4.5 hrs)
+
+Summary: Turned the errors found in the segment edit history into a catalogue of recurring error patterns, sorted by how easily each can be detected, then built and tested a first working detector that finds these errors automatically.
+
+Tasks:
+10:30 to 13:00 (2.5 hrs):
+* Error pattern catalogue
+* Wrote the document ERROR_PATTERN_CATALOG.md.
+* Sorted every pattern into three levels by how it can be detected. Level 1 is mechanical and can be found with simple text rules and no AI: spelling variants, a word typed twice, swaps of linking words, capitalisation-only changes, and a rule to catch words broken by a bulk find-and-replace (the bug found earlier). Level 2 needs statistics across the whole text but still no AI: inconsistent terminology, and mistranslated stock phrases once these are listed. Level 3 genuinely needs an AI or a human: real mistranslations of idioms, sensitive wording, and how the source text was interpreted.
+* Re-checked a specific example from the 21 October exploration.
+
+18:30 to 20:30 (2 hrs):
+* Generalisation strategy, pattern dictionary and working detector
+* Wrote the document GENERALIZATION_STRATEGY.md.
+* Built a reusable dictionary of corrections.
+* Tested the dictionary to check it actually works on new cases and is not just repeating its source.
+* Wrote the detector script covering Level 1 (mechanical rules) and Level 2 (the dictionary), and ran it against real text three times, fixing false alarms each time. The first version of the broken-word rule fired 10,210 times, almost all on correctly written Pali words, because Pali letters with accents were wrongly treated as a separate script. The second version still caught a false match, so I went back to the roughly 100 confirmed cases by hand and replaced the automatic list with a small hand-checked list of word stems. The third fix stopped normal English plurals of those words being flagged. I also excluded one normal English phrase that the "word typed twice" rule had wrongly flagged.
+* Ran the finished detector on the current text of all 43,805 segments. It found 436 more broken words beyond the 297 confirmed earlier, 10,596 places where terminology is inconsistent, 183 words typed twice (including a new error, "he saw ten ten million monks"), and 113 remaining American spellings.
+* Added more real examples to the error pattern catalogue, bringing several patterns from 1 or 2 examples up to 4 to 6, including a confirmation that untranslated Pali names also appear in the Greek translation.
+
+Tikka translation process (Net time: 4.5 hrs)
+
+Summary: Built a new pipeline at about 4.3 times lower cost and 6.5 times faster than before.
+
+Tasks:
+14:00 to 18:30 (4.5 hrs):
+* Wrote a document, with two flowcharts and real measured figures
+* Took the content changes from version 1.1 into the prompt.
+* Building and running the new pipeline
+* Found and fixed a bug before any runs: the parallel script passed the wrong value as the paragraph ID.
+* Ran the dry run, then a live test of 2 paragraphs on each of the three providers. All passed, with real Pali commentary and the correct structure.
+* Ran the full chapter (149 paragraphs) in parallel. 
+* Monitored progress of other providers
+
+Total: 9 hrs
+
+27/10/2026
+
+Working hours: 10:30 to 23:30 (13 hrs)
+
+Tikka translation process (Net time: 4.5 hrs)
+
+Summary: Finished the Info Tabs version comparison and completed the project documentation.
+
+Tasks:
+10:30 to 15:00 (4.5 hrs):
+* Results and quality comparison
+* Wrote a results combiner script that gathers each AI provider's chapter output into one readable file per provider.
+* Pushed the three combined response files, the fluency, cost and time report, and the full pipeline code to the repository.
+* Fix to the deliverable files.
+* Fixed both combiner scripts so the files now contain only the clean deliverable text with paragraph numbering. 
+* Regenerated and re-pushed all 6 combined files.
+* Documentation
+* Added a missing section to the main project guide explaining, step by step, all three Info Tabs processing methods.
+* Revised the architecture comparison document.
+
+Agent Unit Explanations (Net time: 8.5 hrs)
+
+Summary: Started a new project for the Info Tabs process.
+
+Tasks:
+15:00 to 23:30 (8.5 hrs):
+* Setup and checks
+* Set up the new repository and its folder structure following the project's written design instructions.
+* Ran the preflight checks against the live database
+* Planning decisions
+* Downloaded two text-matching (embedding) models for a comparison
+* Tested the retrieval method
+* Created a new results table and a document listing every table and file the project uses.
+* Model comparison test
+* Benchmarked the two models on finding the correct linked commentary for each passage: multilingual-e5-large found it in the top 5 results 79.7% of the time against 78.4% for BGE-M3, so e5 was chosen. Searching the original Pali text directly performed much worse, confirming the English commentary is the right text to search.
+* Name search fixes
+* Built the search that finds people and places mentioned in the text.
+* Prompt builder, four versions
+* Version 1: draft prompts for 3 sample units. Review found duplicated tags, a weak glossary and no proper identification of names.
+* Version 2: used an AI call to identify names, with a classical dictionary of proper names as the main source and text matching to choose the right entry where a name has several. Fixed four matching faults: redirects and see-also notes treated the same, the accent mark problem repeating in the dictionary's index, a rule that wrongly overrode correct matches (removed), and a common group word matching an obscure historical minister.
+* Version 3: changed name extraction to read the root text and both commentaries equally (one unit went from 8 to 35 names found). Fixed a fault where a longer AI response was cut off and wrongly saved as "0 names": raised the response length limit and stopped saving failed results. Added a third lookup source using the e5 model and rebuilt the output into 9 required sections written as flowing prose.
+* Version 4: added a rule that stops the explanations naming internal sources, and built a related-content search that pulls in related passages from the rest of the book but never later passages from the same chapter, so nothing is given away ahead of time. This also fixed an existing case where the fallback search could include later content.
+* Full chapter preparation
+* Built the introduction tracker, which goes through all 149 units in order and marks each name as either a first full introduction or a brief reminder.
+* Fixed a speed problem.
+* Started the full 149-unit prompt build.
+
+Total: 13 hrs
+
+28/10/2026
+
+Working hours: 10:30 to 15:30 and 16:30 to 19:30 (Total 8h)
+
+Agent Unit Explanations (Net time: 5 hrs)
+
+Summary: Generated the final explanations for all 149 units of Chapter 1, checked their quality, put together the client file, corrected the cost figures and drew a diagram of the whole system.
+
+Tasks:
+10:30 to 15:30 (5 hrs):
+* Full explanation run
+* 
+* 
+* Ran a 2-unit trial first. It caught a bug: when the AI model "thinks" before it answers, the thinking comes back ahead of the answer, and the script would have read the wrong part and crashed.
+* Sent all 149 units to the AI model in one discounted batch. 
+* Quality checks
+* Ran the same quality tests we used in the earlier translation experiment.
+* Added checks specific to this project.
+* Combined all 149 explanations into a single plain text file.
+* Cost correction
+* Rechecked the cost report twice when asked to confirm the numbers.
+* I have flagged this for a decision. Rerunning the 2 units would cost a few cents and take about a minute; the alternative is to leave them and disclose the gap.
+* Architecture diagram
+* Drew a flowchart of the system.
+
+LogPrompts Research Alpha (Net time: 3 hrs)
+
+Summary: Learned how to use the company's new documentation and work log system so this project can be set up on it. Nothing was uploaded yet.
+
+Tasks:
+16:30 to 19:30 (3 hrs):
+* Studying the new system
+* Studied the getting-started guide for the new documentation hub and work log system that was introduced by Alpha.
+* Checked the provided package (2 tools, 15 files).
+* Read both tools' instructions and their scripts, and checked one script specifically for anything that sends data out or deletes files.
+* Local trial
+* Ran only read-only steps on this computer.
+* Setup issues found
+* The computer's built-in Python made errors in the environment, so I ran the scripts through a separate tool (uv) instead.
+
+Total: 8 hrs
+
+29/10/2026
+
+Working hours: 10:30 to 14:30 and 16:30 to 20:30
+
+LogProbs Research Alpha (Net time: 8 hrs)
+
+Summary: Checked the profile 17 test results that Alpha shared and research on new materials to upgrade our test.
+
+Tasks:
+10:30 to 14:30 and 16:30 to 20:30 (8 hrs):
+* Review of the new company work log system
+* Studied what the team and lead would actually see on the work log pages, and how the tool collects activity, writes entries and uploads them.
+* Did a trial run of the 30-day activity collector in a separate test folder. 
+* Listed the settings still needed, which can edit and delete any page.
+* Added rules to my project instructions file.
+* Independent check of the profile 17 results
+* Read Alpha's report and the four result spreadsheets for DeepSeek-v4-Flash and Gemma-4.
+* Wrote a checking script that recalculates the report's headline numbers directly from the raw results.
+* Traced one group of automatic-check rows that my script had left out, fixed the rule and ran it again. It then matched the report exactly for both models.
+* Confirmed results: DeepSeek missed 5.0% of real errors and Gemma missed 13.4%. DeepSeek flagged 3,235 segments wrongly and Gemma flagged 2,444.
+* Noted from the report that dropping the low-confidence findings helps DeepSeek only slightly and does not help Gemma at all.
+* Study plan
+* Prepared a list of the concepts needed to follow this research, such as confidence scores and accuracy and miss rates, and a recommended order for reading the project's earlier reports before the profile 17 report.
+
+Total: 8 hrs
+
+30/10/2026
+
+Working hours: 10:30 to 14:30 and 15:30 to 19:30 (8 hrs)
+
+LogPrompts Research Alpha (Net time: 4 hrs)
+
+Summary: I ran a formal pass or fail test to decide whether the AI's confidence scores are useful enough to add to Shindan's translation quality checks, and wrote up the result for the project owner to decide on.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Go or no-go test for confidence scores in Shindan
+* Used Alpha's profile 17 results to answer whether the AI's own confidence can tell real errors apart from false alarms.
+* Wrote down the pass and fail rules before running any new analysis, so the result could not be bent to fit afterwards.
+* Wrote four analysis scripts and a test file to carry out these checks and produce the result tables.
+* Found and fixed a bug where 4 Gemma grammar findings had a missing severity value, which made that group fail by accident.
+* Noticed that the best confidence score was mostly copying Shindan's own existing severity rating, so I added two extra checks: a run using the confidence score alone, and a direct comparison against Shindan's own severity rating.
+* Ran a quick 5-request test on the local DeepSeek server, then a test of a simple Yes or No AI judge on 700 sample findings (50 real and 50 false per error type). All 700 were scored with no errors.
+* Wrote a go or no-go document with the full results and their limits.
+
+PaliVerse AI Corrector (Net time: 4 hrs)
+
+Summary: I made the AI Corrector website safe against crashes and power cuts ahead of a large 15,000+ segment correction run, and fixed a bug that stopped some AI models from working.
+
+Tasks:
+15:30 to 19:30 (4 hrs):
+* Saved a full backup of three weeks of real usage files (9,423 files in one commit) and created a separate known-working copy of the website before making any changes.
+* Added automatic progress saving every 10 rows while AI corrections are being created, so a crashed run can pick up where it stopped. Added a "Resume from N" button that appears when the page is opened.
+* Added automatic saving every 3 seconds while a user reviews and edits corrections, with each user getting their own save slot, and made the saving safe so a file cannot be left half-written.
+* Added a progress record for uploads to the PaliVerse site, updated after every 100 rows, showing how many rows were done, succeeded or failed, who ran it and when.
+* Removed the old 1,000-row warning box because the new progress saving replaces it.
+* Added the logged-in user's name to the page footer.
+* Tested the new saving and resuming directly, including saving, loading, listing and deleting saved progress, and a simulated run that resumed from the middle of a batch. This avoided spending real AI credits just to test it.
+* Put the changes live and checked that the login protection still works and the new features are protected properly.
+* Fixed an AI model error
+* Updated the list of correction models to the newer Opus, Sonnet and Haiku versions.
+* Tested all four models with real requests, put the fix live and confirmed nothing else broke.
+
+Total: 8 hrs
+
+02/11/2026
+
+Working hours: 10:30 to 14:30 and 17:30 to 21:30 (8 hrs)
+
+LogPrompts Research Alpha (Net time: 4 hrs)
+
+Summary: I added a further set of statistics to last week's pass or fail test on the AI's confidence scores in Shindan, and wrote up the full state of the decision so the project owner can decide whether to close the study or run one last narrow test.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Calculated precision, recall and F1 score for each error category, each with a confidence range. These show, per error type, how many flagged errors were real, how many real errors were caught, and the balance of the two. Saved to the table p17_category_prf.tsv.
+* Counted the real human-marked errors for each error category group and each language pair, saved to the table p17_category_counts.tsv.
+* Format errors: only 103 real marked errors across all four language pairs combined.
+* Glossary errors: only 237 real marked errors across all four language pairs combined.
+* Worked out how an escalation approach would look, where unsure findings are passed to a stronger AI model for a second check, saved to the table p17_escalation.tsv.
+* Ran a narrow drop test and calculated how many samples a follow-up test would need to give a reliable answer, saved to the table p17_next_steps_stats.tsv.
+* Wrote a new test script, test_p17_category_prf.py, which checks that the per-category precision, recall and F1 calculations are correct. Ran the full test suite and all 43 of 43 tests passed.
+
+PaliVerse RAG (Net time: 4 hrs)
+
+Summary: I started moving the PaliVerse question-answering and explanation system's database onto Azure using the organisation's nonprofit credits, found and reported a security issue in the existing code, and got a working database server running on Azure.
+
+Tasks:
+17:30 to 21:30 (4 hrs):
+* Reviewing the existing system before making changes
+* Read through the existing code before touching anything. Found that a settings file stored live passwords and AI service keys in plain text, saved into the code history. Reported this as needing the keys to be replaced and moved to a secure store. Not changed yet, as the keys must be replaced first.
+* Planning the Azure setup
+* Checked Microsoft's own documentation.
+* Setting up the database server on Azure
+* The cheapest server option failed with an "unavailable" error in our Azure region.
+* Confirmed other regions are not available on our subscription.
+* Set up a slightly larger server type in the same region instead, which worked. 
+* Installed and tested the search add-on (pgvector 0.8.7) on the new PostgreSQL 16 server with 32GB storage, and confirmed it works.
+
+Total: 8 hrs
+
+03/11/2026
+
+Working hours: 11:30 to 13:00, 14:00 to 15:00, 15:30 to 20:00 (7 hrs)
+
+PaliVerse AI Corrector (Net time: 2.5 hrs)
+
+Summary: Made the correction website show progress again after a page reload, reviewed why the server was running out of disk space, and cleaned up old unused files to free space before the large correction run.
+
+Tasks:
+11:30 to 13:00 (1.5 hrs):
+* Progress bar reconnect and storage review
+* Added a check when the page loads that finds any correction or write-back job still running and reconnects the screen to it, so the progress bar resumes after the user goes offline or refreshes.
+* Added a new banner for write-back jobs that shows live counts of segments done, total and failed.
+* Tested the change live on the website; it only changed web page files, so no server restart was needed.
+
+14:00 to 15:00 (1 hr):
+* Disk cleanup
+* Confirmed the old LogPrompts Research project folder (716MB) was fully saved and backed up in git before removing anything.
+* Traced the local AI model setup used by that project: an 8.0GB model engine folder and a 13GB shared model storage area that also holds other unrelated models.
+* Updated the LogPrompts Research build instructions with a note explaining the local setup was removed and how to rebuild it, and saved this to the project repository.
+* Removed only the one LogPrompts model from the shared model storage, leaving all other models untouched.
+* Removed the 8.0GB model engine folder.
+* Prepared the command to remove the remaining 716MB project folder, to be run manually.
+
+PaliVerse RAG (Net time: 4.5 hrs)
+
+Summary: Confirmed the real Azure budget and rules for our nonprofit credit, worked out how to keep database costs low, and set up the shared database design on Azure so all future features can use it.
+
+Tasks:
+15:30 to 20:00 (4.5 hrs):
+* Azure budget and rules
+* Checked Microsoft's own documentation for the nonprofit credit limits and rules.
+* Made a project plan and mapped essential core services.
+* Confirmed every Azure service this project uses or plans to use is allowed under the nonprofit credit rules.
+* Found that running the database all day every day would use almost the whole budget.
+* Planned to start the database only for working sessions and stop it afterwards.
+* Estimated cost.
+* Confirmed Azure sleep modes.
+* Wrote and ran scripts to start and stop the database, and confirmed they work end to end.
+* Drafted new database design
+* Reviewed the database design to confirm it supports info tab generation, a future live question and answer feature, and internal testing from one shared source.
+* Added a quality status field.
+* Added a field to keep some content internal only, hidden from future live users.
+* Added a field to the usage log recording which feature made each request, so Azure usage can be split per feature.
+* Created the full database structure on the Azure server for the first time and checked it directly on the live server.
+* Fixed a setup issue where a text search add-on needed for the glossary was not enabled on the Azure server, then created the glossary index successfully.
+* Noted that the new chapter 1 explanation format (10 headings) will need to be mapped when the data is loaded; no database change needed.
+* Stopped the database server after the work so it is not left running.
+
+Total: 7 hrs
+
+04/11/2026
+
+Working hours: 10:30 to 19:30 (9 hrs)
+
+PaliVerse RAG (Net time: 9 hrs)
+
+Summary: Moved the chapter 1 research data onto the Azure server, loaded and indexed it so the system can search it, fixed several faults found along the way, rebuilt the missing instruction files for the AI, and started the first live test of the question and answer system.
+
+Tasks:
+10:30 to 19:30 (9 hrs):
+* Preparation and checks
+* Started the Azure server and confirmed that the database changes made on 3 November were still in place (both new columns present, correct version number).
+* Moving the data to Azure
+* Searched for the source research data and found it was not where the code expected it.
+* Searched every local database and found the real data split across two databases, confirmed by matching columns and chapter 1 content.
+* Extracted only the chapter 1 data needed and loaded it onto the Azure server under the names the existing code already uses, so no code changes were needed for this part.
+* Code fixes to make the transfer work
+* Added a secure connection (SSL) setting to the database connection code, which Azure requires, while keeping local databases working as before.
+* Pointed the system settings at the Azure server and added the new benchmark as a data source.
+* Wrote a staging script that copies the Agent Unit Explanations output into the file naming format the loading code expects.
+* Extended the section mapping so the system understands the new 10 heading format, while keeping the old 5 heading format working.
+* Loading and indexing the data
+* Ran the full data load and converted all text into searchable form (embeddings).
+* Canonical text sections loaded
+* Generated benchmark sections loaded
+* Commentary sections loaded
+* Sub-commentary sections loaded
+* Total sections loaded and indexed
+* Glossary was skipped this run because its source file is on an unreachable Windows path.
+* Quality and tracking
+* Added a label to every question asked so that questions from the live feature can be told apart from internal testing.
+* Wrote a cost check script that reads the real Azure spend.
+* Ran a status check confirming all section and index counts were intact and all tags were correct.
+* Rebuilt all four instruction files based directly on how the search code works.
+* Testing the question and answer system.
+* Reran the demo.
+* The full test run still running at the end of the day.
+
+Total: 9 hrs
+
+05/11/2026
+
+Working hours: 10:30 to 14:30, 16:30 to 20:30
+
+PaliVerse RAG (Net time: 8 hrs)
+
+Summary: Confirmed yesterday's demo test results, and safety checks, looked into a request to test a new AI search model and put it on hold because it needs hardware we do not have, worked out the size and cost of loading the whole PaliVerse text collection, and built and test-ran the tool that will load it.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Checked the results of yesterday's demo test run against the saved records; all 6 test questions completed and were recorded correctly.
+* In-scope questions: 5 out of 5 found closely matching passages, a better match than in earlier documented tests
+* Added deliberate trick questions and tests on a topics outside our texts. 
+* Found response time problem.
+* Setup our existing benchmark to compare against new embedding model: the current setup finds the correct linked passage in its top 5 results 79.73% of the time when searching in English and 34.46% when searching in Pali.
+* Checked for a free online way to try the model instead; none was available, and the provider's online service could not be reached.
+* Size and cost estimate for the full text collection
+
+16:30 to 20:30 (4 hrs):
+* Planned the full load of the original texts in English and Pali, the commentaries in English and Pali, and the sub-commentaries in Pali. AI-written explanations are not included, as they have not been approved for the rest of the collection yet.
+* Mapped the work needed: 59 original texts split into 738 separate chapters to process.
+* Exported the full set of text from the source database and loaded it into Azure.
+* Rows loaded: 4,994,445 (about 1.15GB)
+* Checked that the number of rows loaded matched the source exactly.
+* Fixed a small mistake in the first load attempt that stopped it from running, then ran it again successfully.
+* Built a new loading tool that reuses the existing chapter 1 process, so every chapter is handled the same way.
+* Fixed one error found before testing, where the tool was looking for the data under the wrong name on Azure.
+* Ran a small test on 2 original texts and 23 chapters.
+* Sections prepared in the test: 8,696.
+
+Total: 8 hrs
+
+06/11/2026
+
+Working hours: 10:30 to 14:30 and 16:30 to 22:30 (10 hrs)
+
+PaliVerse RAG (Net time: 10 hrs)
+
+Summary: Loaded the entire collection of texts into the search system for the first time, fixed three faults that this larger load exposed, confirmed the data is complete and correct, and started testing whether the system can link a passage to its related commentary automatically without an extra AI step.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Loading the full collection
+* Started the full data load covering all 59 main texts (738 chapters), running in the background on the Azure server so it would not stop if my session ended.
+* All 738 chapters were split into searchable sections in under an hour. The total came to about 3 times the earlier estimate because the commentary texts break into many more sections than the main texts. The earlier estimate of storage space was still accurate.
+* Fault 1: very slow duplicate check
+* After splitting, the load stalled for over an hour. Found the cause: before indexing each section, the system checked one section at a time whether it was already done, which meant over 240,000 separate requests to the database.
+* Stopped the load safely (no completed work was lost) and changed it to do one combined check instead. That step now takes seconds instead of hours.
+* Restarted the indexing, which then finished in about 57 minutes.
+* Fault 2: chapter 1 test data removed by mistake
+* Found that the full load had wrongly deleted the 2,408 generated chapter 1 sections from our earlier benchmark, treating them as out of date.
+* Restored them from the original files without touching the rest of the data, re-applied the needs review flags, and fixed the load script so this cannot happen again.
+* Final verified figures
+* Total sections loaded and indexed: 244,804 (every section confirmed indexed)
+* Sections flagged for review: 36 (the two known units)
+* Total database size: about 5.0 GB (estimate was 5.6 GB)
+* Indexing cost: about $6.24 (higher than the earlier estimate because of the larger section count)
+* Not included by agreement: glossary, knowledge graph, and AI explanations beyond chapter 1.
+* Checking the result
+* Wrote a check script covering counts, duplicates, references, coverage of every text and consistency. All 6 data checks passed.
+* Fault 3: search only looked at one text
+* Test questions about other texts all returned chapter 1 content. Found that the search code had always been limited to a single text from when this was a one chapter test project, so the new data could not be reached. A related step could also have looked up commentary in the wrong text.
+* Fixed both so the search now covers the whole collection and each result uses its own text.
+* Retested: 3 of 4 tests passed. The remaining question (about a monastic training rule) returned related but wrong material even though the right material is in the collection. Noted for a separate investigation rather than a quick patch.
+* 16:30 to 22:30 (6 hrs):
+* Linking passages to their commentary
+* Goal: use the search system to find passages that belong together, as groundwork for generating the information tabs, using only the stored search data and no extra AI calls.
+* Wrote a test that takes 31,588 known passage to commentary links and checks whether the system finds the right commentary among its top 5 results. This uses no paid calls since all data was already indexed.
+* Found and fixed two faults in the test itself before trusting its numbers (a data format error, and a comparison between two different numbering systems). After the fixes the results became realistic.
+* Result so far: 12,000 of 31,588 links tested with 68.4% found correctly, close to our earlier small benchmark (about 79%) but on a sample about 200 times larger. This suggests the current setup can link passages to their commentary well enough to be useful.
+* The test is still running and the final figure will follow.
+* Other models
+* While the test ran, looked into alternatives to the larger search model recommended by the provider, since that one needs a GPU server and our Azure account currently has no GPU quota. Found no ready hosted version of it, but found one easy upgrade option that runs on our current setup and scores better on a standard benchmark.
+
+Total: 10 hrs
+
+09/11/2026
+
+Working hours: 10:30 to 14:30, 15:30 to 21:00 (9.5 hrs)
+
+PaliVerse RAG (Net time: 4 hrs)
+
+Summary: Collected the final result of the large linking test that ran over the weekend, built a new tool that finds related passages anywhere in the text collection and checked its results by hand, and re-ran the earlier demo test to make sure last week's search fix did not break anything.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Final linking test result
+* The test checking whether the system finds the right commentary passage for each text unit finished overnight.
+* Links found correctly in the top 5 results: 16,962 of 25,975 (65.3%)
+* Time taken by the full test: about 7.7 hours
+* Earlier small benchmark: 79.7%, but that covered only 148 links from one chapter, while this test covers the whole collection, so the two are not directly comparable.
+* Found a clear pattern in the misses: when one commentary passage explains several text units at once, the system often fails to rank it highly for each of those units.
+* Related passages tool
+* Built a tool that, for any text unit, finds related content from anywhere in the full collection. It uses the data already prepared, so it adds no new running cost. This is the first step towards using the search system to generate the information tabs.
+* Tried it on 3 sample units and saved the results in a report.
+* Read the full passages behind the results instead of relying on the tool's score alone. Of two connections found between different texts, one was confirmed as genuinely strong (nearly identical wording), and the other turned out to share only a common story-telling phrase, not the actual topic. Corrected the report accordingly.
+* Noted that a good score from the tool is not enough on its own, so results must be checked by reading the content before they are used for the information tabs.
+* Demo test re-run
+* Re-ran the original 6 chapter 1 test questions to confirm last Friday's search fix did not affect other questions.
+* It ran much slower than before because the new tool and this test were using the same small server at the same time.
+* The test was still running at 14:30 and was left to finish on its own.
+* Azure cost check
+* Ran our cost check script and found the project's spend for this month rose because the server was left running after the weekend test finished.
+* Month-to-date spend before: 0.36 EUR
+* Month-to-date spend now: 13.44 EUR
+* The server is being left on once more today so the demo re-test can finish, since stopping it midway would waste the work. Flagged so this does not become a habit.
+
+LogPrompts Research Alpha (Net time: 5.5 hrs)
+
+Summary: Built a breakdown of where our two AI models agree and disagree with human reviewers for each type of translation error, checked the team meeting's conclusion against our data, wrote a plain-language team briefing, and set up a private local copy of the team documentation site since the real one cannot be reached.
+
+Tasks:
+15:30 to 21:00 (5.5 hrs):
+* Error type breakdown
+* Built a program that counts, for each type of translation error, how often our two AI models (DeepSeek and Gemma) correctly or wrongly kept or dropped a reported error, using the original Alpha result as the comparison.
+* Meaning errors (DeepSeek, confidence check): 1,630 of 3,568 kept as genuine, against Alpha's 1,908, with 278 missed that Alpha kept
+* Yes/No check on 700 errors (DeepSeek): punctuation 47 of 50 correct, formatting 40 of 50, style 50 of 50
+* Glossary and formatting errors showed the least difference, which matches earlier findings that these two types give no useful signal.
+* Team meeting conclusion check
+* The meeting concluded that completeness, glossary and formatting errors are all useful for this approach.
+* Checked each against both halves of our test data: only completeness holds up in both halves. Glossary shows no useful signal, and formatting gives mixed results on too small a sample to rely on.
+* Flagged that the meeting's conclusion is not supported by our data or by Alpha's own report.
+* Team briefing
+* Wrote a team briefing and rewrote it twice based on feedback: first replacing statistics terms with plain language, then centring the comparison table on our own tests, then shortening it with simpler headings.
+* Saved it to the project repository.
+* Team documentation site
+* The setup email said a knowledge base had been created for us on the team documentation site, but the site refuses connections from my machine, while a colleague's site on the same network works normally.
+* Set up a private copy of the documentation software on my own machine so work could continue, with all outside syncing switched off so nothing is sent anywhere.
+* Drafted, but did not publish, an experiment tracker page covering all 11 experiments in the project and three short work log entries on the current test and next steps. The wording has been approved and will be published once the real site is reachable.
+* Drafted an email to the person who sent the setup instructions, reporting the connection problem and asking them to confirm the project list.
+
+Total: 9.5 hrs
+
+11/11/2026
+
+Working hours: 10:30 to 14:30 and 15:30 to 19:30 (8 hrs)
+
+PaliVerse RAG (Net time: 4 hrs)
+
+Summary: Built an automatic check that separates genuinely related passages from ones that only share common wording, compared three AI models to decide which one should make the final call on uncertain cases, confirmed every text unit in chapter 1 now has related passages after fixing a bug, and started preparing the same process for the whole collection of texts at a lower cost.
+
+Tasks:
+10:30 to 14:30 (4 hrs):
+* Built a free automatic check (no AI cost) that measures how much real content two passages share.
+* Tested it first on the two known examples before relying on it.
+* Added a second check that compares the names of people and places in both passages, which fixed a case where a passage said the same thing in different words.
+* Built a final step that sends only the small number of still uncertain cases to an AI model for a decision. 
+* Compared three Claude AI models (Haiku, Sonnet and Opus) on the same uncertain cases and read every disagreement by hand rather than just counting votes.
+* Chose Opus as the default, since missing a real connection is the more costly mistake for the information tabs.
+* Full chapter 1 coverage and bug fix
+* Plan for the information tabs
+* Cost estimate for the whole collection
+* Preparing the whole collection run
+* Confirmed the new setup works with a small test of 11 requests (all 11 handled correctly), then started the full run, which was left running in the background at 14:30.
+
+LogPrompts Research Alpha (Net time: 4 hrs)
+
+Summary: Built and ran a careful testing process to tune the confidence filter on Shindan findings for each error type, then a second process to improve the Yes/No checking questions given to the AI, and recorded both results honestly, including where the approach does not work.
+
+Tasks:
+15:30 to 19:30 (4 hrs):
+* Republished the main pages of the team knowledge base after approval, with the open items and next steps sections removed as requested.
+* Confidence filter tuning
+* Wrote down the pass or fail rules before running any new tests, so the results cannot be judged favourably after the fact.
+* Built a program that tunes the filter step by step on a growing share of the training data, keeps half of the data completely unseen until one final test, and corrects for the number of tests run so chance results are not counted as success. Added 11 automated checks for it.
+* Ran it on all 7 error types. Made two corrections after the first results to make the comparison fairer and more reliable, and recorded both openly.
+* Built a program to improve the Yes/No questions the AI is asked about each reported error. 
+* Ran the program
+* Limitations recorded
+* The filter tuning work is saved to the project repository.
+
+Total: 8 hrs
