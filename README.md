@@ -49,8 +49,9 @@ Source project repos:
 | [2026-11-20](2026-11-20.md) | 11.5h total (10:30–22:00) — PaliVerse RAG | PaliVerse RAG (safely removed a client-flagged text from the RAG without destroying genuine canonical content; built and tuned a new entity-linking connection method end to end — ~120x + ~12x real performance fixes, chapter-1 then chapter-2 collision checks confirming the method generalizes, a real ~3x-cost data-duplication bug found and worked around; exported 205 validated connections across 114/149 chapter-1 units; built but did not run 5 pilot generation prompts, pending required user review) | No entries found for 2026-11-19 (weekday) |
 | [2026-11-23](2026-11-23.md) | 9h total (10:30–19:30) — Agent Unit Explanations | Agent Unit Explanations (found an accuracy bug — "abuses" overstated the source text — fixed with a new storyteller rule; ran the real 149-unit cross-canon generation, $11.60, 149/149 succeeded; found the rule only partially fixed the bug class — one more instance found and hand-patched directly) | No entries found for 2026-11-21/22 (weekend) |
 | [2026-11-24](2026-11-24.md) | 9h total — Agent Unit Explanations 2h (10:30–12:30), PaliVerse RAG 7h (12:30–19:30) | Agent Unit Explanations (found a content-richness regression, isolated it with a controlled experiment to the new context blocks crowding out the model, fixed with a new rule, re-ran the full chapter — net +382 Key Terms entries chapter-wide), PaliVerse RAG (new staging deployment built at rag-stage.paliverse.org — a FastAPI replacement for the never-deployed Streamlit app, first-ever requirements.txt, found the full canon was already migrated to Azure, deploy scaffolding built, found the committed OpenAI key has zero credits — not a blocker, hosting proceeds) | New hosted environment started: rag-stage.paliverse.org |
+| [2026-11-25](2026-11-25.md) | 8h total — Agent Unit Explanations 4h (10:30–14:30), LogPrompts Research 4h (15:30–19:30) | Agent Unit Explanations (built a restricted-sources prompt module for whole-canon scale, found and fixed two real Pali-matching bugs along the way — one unit's "not found" count dropped from 28 to 2), LogPrompts Research (built a full pre-registered go/no-go pipeline on a new 5,000-per-pair dataset — final verdict INCONCLUSIVE on every question; the signal beats Shindan's own score but a simple severity/length baseline matches it, so the recommendation is not to build a confidence layer on this evidence) | |
 
-**Total hours logged so far: 287h** (10h on 2026-10-07, 9h on
+**Total hours logged so far: 295h** (10h on 2026-10-07, 9h on
 2026-10-08, 10h on 2026-10-09, 8.5h on 2026-10-12, 7h on 2026-10-13,
 7h on 2026-10-14, 7h on 2026-10-15, 8h on 2026-10-16, 10h on
 2026-10-19, 12h on 2026-10-20, 12.5h on 2026-10-21, 8h on 2026-10-22,
@@ -59,4 +60,4 @@ Source project repos:
 on 2026-11-03, 9h on 2026-11-04, 8h on 2026-11-05, 10h on 2026-11-06,
 9.5h on 2026-11-09, 8h on 2026-11-11, 8h on 2026-11-12, 10.5h on
 2026-11-16, 8h on 2026-11-17, 8h on 2026-11-18, 11.5h on 2026-11-20,
-9h on 2026-11-23, 9h on 2026-11-24).
+9h on 2026-11-23, 9h on 2026-11-24, 8h on 2026-11-25).
